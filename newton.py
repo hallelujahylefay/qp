@@ -2,9 +2,9 @@ import jax
 import jax.numpy as jnp
 
 beta = 0.99
-alpha = 0.01
+alpha = 0.1
 
-
+@jax.jit
 def centering_step(Q, p, A, b, t, v0, eps):
     def objective(v):
         return v.T @ Q @ v + p.T @ v
@@ -22,15 +22,15 @@ def centering_step(Q, p, A, b, t, v0, eps):
 
         jac, hessian = jax.jacfwd(_centering_objective)(v), jax.hessian(_centering_objective)(v)
         Deltax_nt = - jnp.linalg.inv(hessian) @ jac
-        lambda_square = - jac @ Deltax_nt
-        t_star = backtracking_line_search(v, Deltax_nt, jac)
+        lambda_square = - jac.T @ Deltax_nt
+        t_star = backtracking_line_search(v, Deltax_nt, lambda_square)
         v += t_star * Deltax_nt
         return lambda_square, v, t
 
-    def backtracking_line_search(v, Deltax_nt, jac):
+    def backtracking_line_search(v, Deltax_nt, lambda_square):
         def cond(t_p):
             return centering_objective(t, v + t_p * Deltax_nt) >= centering_objective(t,
-                                                                                      v) + alpha * t_p * jac.T @ Deltax_nt
+                                                                                      v) + alpha * t_p * lambda_square
 
         def iter_backtracking(t_p):
             return t_p * beta
@@ -41,8 +41,9 @@ def centering_step(Q, p, A, b, t, v0, eps):
     _, v, t = jax.lax.while_loop(cond, iter_newton, (3 * eps, v0, t))
     return v
 
-
+@jax.jit
 def barr_method(Q, p, A, b, v0, eps, mu=10):
+    m = b.shape[0]
     def iter_barrier(inps):
         v, t = inps
         v_star = centering_step(Q, p, A, b, t, v, eps)
@@ -51,7 +52,7 @@ def barr_method(Q, p, A, b, v0, eps, mu=10):
 
     def cond(args):
         _, t = args
-        return 1 / t > eps
+        return m / t > eps
 
     v_optimal, _ = jax.lax.while_loop(cond, iter_barrier, (v0, 1))
     return v_optimal
