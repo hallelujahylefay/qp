@@ -45,10 +45,10 @@ def centering_step(Q, p, A, b, t, v0, eps, max_iter=100):
     def backtracking_line_search(v, descent_step, lambda_square, max_iter=10):
         def cond(inps):
             n_iter, t_p = inps
-            return (centering_objective(t, v + t_p * descent_step) >= centering_objective(t,
-                                                                                          v) - alpha * t_p * lambda_square) & (
-                       jnp.all(A @ (v + t_p * descent_step) < b)
-                   ) & (n_iter < max_iter)
+            return ((centering_objective(t, v + t_p * descent_step) >= centering_objective(t,
+                                                                                           v) - alpha * t_p * lambda_square) | (
+                        jnp.any(A @ (v + t_p * descent_step) >= b)
+                    )) & (n_iter < max_iter)
 
         def iter_backtracking(inps):
             n_iter, t_p = inps
