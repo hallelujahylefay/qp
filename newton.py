@@ -1,8 +1,19 @@
 import jax
 import jax.numpy as jnp
+
 jax.config.update('jax_enable_x64', True)
+
+
 @jax.jit
-def centering_step(Q, p, A, b, t, v0, eps, max_iter=10):
+def qp(v, Q, p):
+    """
+    Quadratic program objective function
+    """
+    return v.T @ Q @ v + p.T @ v
+
+
+@jax.jit
+def centering_step(Q, p, A, b, t, v0, eps, max_iter=100):
     """
     Centering step of the barrier method for quadratic programs:
         min v.T Q v + p.T v
@@ -11,15 +22,12 @@ def centering_step(Q, p, A, b, t, v0, eps, max_iter=10):
     This code is not optimized for memory usage, there is no need to store all the iterates.
     """
 
-    def objective(v):
-        return v.T @ Q @ v + p.T @ v
-
     def centering_objective(t, v):
-        return t * objective(v) - jnp.sum(jnp.log(b - A @ v))
+        return t * qp(v, Q, p) - jnp.sum(jnp.log(b - A @ v))
 
     def cond(args):
         n_iter, lambda_square, _, _, _ = args
-        return (lambda_square / 2 > eps) & (n_iter <= max_iter)
+        return (lambda_square / 2 > eps) & (n_iter < max_iter)
 
     def iter_newton(inps):
         n_iter, _, v, vs, t = inps
@@ -31,7 +39,7 @@ def centering_step(Q, p, A, b, t, v0, eps, max_iter=10):
         vs = vs.at[n_iter].set(v)
         return n_iter + 1, lambda_square, v, vs, t
 
-    beta = 0.99
+    beta = 0.5
     alpha = 0.1
 
     def backtracking_line_search(v, descent_step, lambda_square, max_iter=10):
@@ -40,7 +48,7 @@ def centering_step(Q, p, A, b, t, v0, eps, max_iter=10):
             return (centering_objective(t, v + t_p * descent_step) >= centering_objective(t,
                                                                                           v) - alpha * t_p * lambda_square) & (
                        jnp.all(A @ (v + t_p * descent_step) < b)
-                   ) & (n_iter <= max_iter)
+                   ) & (n_iter < max_iter)
 
         def iter_backtracking(inps):
             n_iter, t_p = inps
@@ -55,8 +63,9 @@ def centering_step(Q, p, A, b, t, v0, eps, max_iter=10):
     _, _, v, vs, t = jax.lax.while_loop(cond, iter_newton, (1, 3 * eps, v0, vs0, t))
     return v, vs
 
+
 @jax.jit
-def barr_method(Q, p, A, b, v0, eps, mu=10, max_iter=10):
+def barr_method(Q, p, A, b, v0, eps, mu=10, max_iter=100):
     """
     Barrier method for quadratic programs.
     This code is not optimized for memory usage, there is no need to store all the iterates.
@@ -72,9 +81,9 @@ def barr_method(Q, p, A, b, v0, eps, mu=10, max_iter=10):
 
     def cond(args):
         n_iter, _, _, t = args
-        return (m / t > eps) & (n_iter <= max_iter)
+        return (m / t > eps) & (n_iter < max_iter)
 
     vs0 = jnp.zeros((max_iter, *v0.shape))
     vs0 = vs0.at[0].set(v0)
-    _, v_optimal, vs, _ = jax.lax.while_loop(cond, iter_barrier, (1, v0, vs0, 1))
-    return v_optimal, vs
+    n_iter, v_optimal, vs, _ = jax.lax.while_loop(cond, iter_barrier, (1, v0, vs0, 1))
+    return n_iter, v_optimal, vs
