@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 import jax
-from newton import barr_method, qp
+from qp import barr_method, qp
 
 
 @jax.jit
@@ -29,7 +29,10 @@ def solve_lasso(X, y, penalization, mu, eps=1e-16):
     Q, p, A, b = cast_lasso_to_qp(X, y, penalization)
     feasible_v = jnp.zeros((shape[0],))
 
-    n_iter, _, duals = barr_method(Q, p, A, b, feasible_v, eps, mu)
+    n_iter, n_iters_centering, _, duals = barr_method(Q, p, A, b, feasible_v, eps, mu)
+
+    shape = duals.shape
+    duals = duals.reshape((-1, shape[-1]))
 
     dual_objective_vmap = jax.vmap(qp, in_axes=(0, None, None))
     lasso_objective_vmap = jax.vmap(lasso_objective, in_axes=(0, None, None, None))
@@ -39,4 +42,8 @@ def solve_lasso(X, y, penalization, mu, eps=1e-16):
     values_for_dual_objective = dual_objective_vmap(duals, Q, p)
     lasso_objective_values = lasso_objective_vmap(primals, X, y, penalization)
 
-    return n_iter, duals, primals, values_for_dual_objective, lasso_objective_values
+    primals = primals.reshape((*shape[:-1], primals.shape[-1]))
+    values_for_dual_objective = values_for_dual_objective.reshape(shape[:-1])
+    lasso_objective_values = lasso_objective_values.reshape(shape[:-1])
+
+    return n_iter, n_iters_centering, duals, primals, values_for_dual_objective, lasso_objective_values
