@@ -49,7 +49,7 @@ def centering_step(Q, p, A, b, t, v0, eps, max_iter=10):
         t_star = jax.lax.while_loop(cond, iter_backtracking, (0, 1.0))
         return t_star
 
-    n_iter, _, v, t = jax.lax.while_loop(cond, iter_newton, (1, 3 * eps, v0, t))
+    n_iter, _, v, t = jax.lax.while_loop(cond, iter_newton, (0, 3 * eps, v0, t))
     return n_iter, v
 
 

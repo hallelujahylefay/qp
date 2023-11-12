@@ -5,7 +5,7 @@ from timeit import timeit
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
-N = 100
+N = 100  # number of lasso problems
 OP_key = jax.random.PRNGKey(0)
 keys = jax.random.split(OP_key, N)
 
@@ -22,12 +22,14 @@ for mu in mus:
         return solve_lasso(X, y, penalization=penalization, mu=mu, eps=1e-6)
 
 
-    n_iters, n_iters_centering, _, _, values_for_dual_objective, lasso_objective_values = wrapper_lasso_barr_method(keys)
+    n_iters, n_iters_centering, _, _, values_for_dual_objective, lasso_objective_values = wrapper_lasso_barr_method(
+        keys)
     for i in range(N):
         iteration = n_iters[i]
         n_iters_centering[i]
         reconstructed_values_for_dual_objective = jnp.concatenate(
-            [values_for_dual_objective[i][:iteration][j][1:n_iters_centering[i][j]] for j in range(iteration)])
+            [jnp.trim_zeros(values_for_dual_objective[i][:iteration][j][1:n_iters_centering[i][j]]) for j in
+             range(iteration)])
         min = jnp.min(reconstructed_values_for_dual_objective)
         plt.semilogy(range(len(reconstructed_values_for_dual_objective)), reconstructed_values_for_dual_objective - min)
 

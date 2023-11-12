@@ -3,7 +3,7 @@ import jax.numpy as jnp
 
 jax.config.update('jax_enable_x64', True)
 max_iter = 100
-
+max_iter_centering = 10 # ~ ceil(log(m eps) / log(mu)) ~= 10
 
 @jax.jit
 def qp(v, Q, p):
@@ -14,7 +14,7 @@ def qp(v, Q, p):
 
 
 @jax.jit
-def centering_step(Q, p, A, b, t, v0, eps, max_iter=max_iter):
+def centering_step(Q, p, A, b, t, v0, eps, max_iter=max_iter_centering):
     """
     Centering step of the barrier method for quadratic programs:
         min v.T Q v + p.T v
@@ -77,7 +77,7 @@ def barr_method(Q, p, A, b, v0, eps, mu=10, max_iter=max_iter):
 
     def iter_barrier(inps):
         n_iter, n_iters_centering, v, vs, t = inps
-        n_iter_centering, v_star, vs_centering = centering_step(Q, p, A, b, t, v, eps)
+        n_iter_centering, v_star, vs_centering = centering_step(Q, p, A, b, t, v, eps) # n_iter_centering must be hardcoded
         n_iters_centering = n_iters_centering.at[n_iter].set(n_iter_centering)
         vs = vs.at[n_iter].set(vs_centering)
         t *= mu
@@ -87,8 +87,8 @@ def barr_method(Q, p, A, b, v0, eps, mu=10, max_iter=max_iter):
         n_iter, _, _, _, t = args
         return (m / t > eps) & (n_iter < max_iter)
 
-    vs0 = jnp.zeros((max_iter, max_iter, *v0.shape))
-    vs0 = vs0.at[0].set(jnp.full((max_iter, *v0.shape), v0))
+    vs0 = jnp.zeros((max_iter, max_iter_centering, *v0.shape))
+    vs0 = vs0.at[0].set(jnp.full((max_iter_centering, *v0.shape), v0))
     n_iter, n_iters_centering, v_optimal, vs, _ = jax.lax.while_loop(cond, iter_barrier,
-                                                                     (1, jnp.zeros((max_iter,), dtype=int), v0, vs0, 1))
+                                                                     (1, jnp.zeros((max_iter_centering,), dtype=int), v0, vs0, 1))
     return n_iter, n_iters_centering, v_optimal, vs
