@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
-from lasso import solve_lasso
-from timeit import timeit
+from qp.lasso import solve_lasso
+from qp.timeit import timeit
 import matplotlib.pyplot as plt
 import numpy as np
 

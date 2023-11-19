@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 import jax
-from qp import barr_method, qp
+from qp.qp import barr_method, qp
 
 
 @jax.jit

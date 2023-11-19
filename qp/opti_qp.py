@@ -1,4 +1,4 @@
-from qp import qp
+from qp.qp import qp
 import jax
 import jax.numpy as jnp
 
